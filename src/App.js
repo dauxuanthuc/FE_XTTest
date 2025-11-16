@@ -1,24 +1,85 @@
-import logo from './logo.svg';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
+import NavBar from './components/NavBar';
+import Home from './pages/Home';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import AdminPage from './pages/AdminPage';
+import TeacherPage from './pages/TeacherPage';
+import UserPage from './pages/UserPage';
+import JoinClass from './pages/JoinClass';
+import StudyPractice from './pages/StudyPractice';
+import TakeExam from './pages/TakeExam';
+import ExamHistory from './pages/ExamHistory';
+import authService from './services/auth.service';
+
+function RequireAuth({ children, roles }) {
+  const user = authService.getCurrentUser();
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  if (roles && roles.length > 0) {
+    const ok = roles.some(r => user.roles.includes(r));
+    if (!ok) return <div style={{ padding: 20 }}>Access denied</div>;
+  }
+  return children;
+}
 
 function App() {
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <BrowserRouter>
+      <NavBar />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+
+        <Route path="/admin" element={
+          <RequireAuth roles={["ROLE_ADMIN"]}>
+            <AdminPage />
+          </RequireAuth>
+        } />
+
+        <Route path="/teacher" element={
+          <RequireAuth roles={["ROLE_TEACHER"]}>
+            <TeacherPage />
+          </RequireAuth>
+        } />
+
+        <Route path="/user" element={
+          <RequireAuth>
+            <UserPage />
+          </RequireAuth>
+        } />
+
+        <Route path="/student/join" element={
+          <RequireAuth>
+            <JoinClass />
+          </RequireAuth>
+        } />
+
+        <Route path="/student/practice" element={
+          <RequireAuth>
+            <StudyPractice />
+          </RequireAuth>
+        } />
+
+        <Route path="/student/exam" element={
+          <RequireAuth>
+            <TakeExam />
+          </RequireAuth>
+        } />
+
+        <Route path="/student/history" element={
+          <RequireAuth>
+            <ExamHistory />
+          </RequireAuth>
+        } />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
