@@ -23,6 +23,7 @@ export default function AdminQuestionManagement() {
     description: '',
     // default to class-only; can be "PUBLIC"
     visibility: 'CLASS',
+    subject: '',
     isExamScoped: false
   });
 
@@ -85,7 +86,8 @@ export default function AdminQuestionManagement() {
           title: formData.title,
           description: formData.description,
           visibility: formData.visibility,
-          isExamScoped: formData.isExamScoped
+          isExamScoped: formData.isExamScoped,
+          subject: formData.subject
         }, {
           headers: getHeaders()
         });
@@ -96,14 +98,15 @@ export default function AdminQuestionManagement() {
           title: formData.title,
           description: formData.description,
           visibility: formData.visibility,
-          isExamScoped: formData.isExamScoped
+          isExamScoped: formData.isExamScoped,
+          subject: formData.subject
         }, {
           headers: getHeaders()
         });
         setSuccessMessage('Tạo đề mới thành công!');
       }
 
-      setFormData({ title: '', description: '', visibility: 'CLASS', isExamScoped: false });
+      setFormData({ title: '', description: '', visibility: 'CLASS', subject: '', isExamScoped: false });
       setShowForm(false);
       setEditingId(null);
       fetchQuestionSets();
@@ -127,7 +130,7 @@ export default function AdminQuestionManagement() {
   };
 
   const handleEdit = (qs) => {
-    setFormData({ title: qs.title, description: qs.description, visibility: qs.visibility || 'CLASS', isExamScoped: !!qs.isExamScoped });
+    setFormData({ title: qs.title, description: qs.description, visibility: qs.visibility || 'CLASS', subject: qs.subject || '', isExamScoped: !!qs.isExamScoped });
     setEditingId(qs.id);
     setShowForm(true);
   };
@@ -246,6 +249,16 @@ export default function AdminQuestionManagement() {
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 style={{ width: '100%', padding: 8, minHeight: 80 }}
+              />
+            </div>
+            <div style={{ marginBottom: 10 }}>
+              <label>Môn: </label>
+              <input
+                type="text"
+                value={formData.subject}
+                onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                placeholder="Nhập môn, ví dụ: Đại cương, Chuyên ngành"
+                style={{ width: '100%', padding: 8 }}
               />
             </div>
             <div style={{ marginBottom: 10 }}>
@@ -413,6 +426,7 @@ export default function AdminQuestionManagement() {
             <tr style={{ backgroundColor: '#f0f0f0', borderBottom: '2px solid #ddd' }}>
               <th style={{ padding: 10, textAlign: 'left' }}>Tiêu đề</th>
               <th style={{ padding: 10, textAlign: 'left' }}>Mô tả</th>
+              <th style={{ padding: 10, textAlign: 'left' }}>Môn</th>
               <th style={{ padding: 10, textAlign: 'center' }}>Số Câu</th>
               <th style={{ padding: 10, textAlign: 'center' }}>Loại File</th>
               <th style={{ padding: 10, textAlign: 'left' }}>Tạo bởi</th>
@@ -425,6 +439,7 @@ export default function AdminQuestionManagement() {
               <tr key={qs.id} style={{ borderBottom: '1px solid #ddd' }}>
                 <td style={{ padding: 10 }}>{qs.title}</td>
                 <td style={{ padding: 10 }}>{qs.description || '-'}</td>
+                <td style={{ padding: 10 }}>{qs.subject || '-'}</td>
                 <td style={{ padding: 10, textAlign: 'center' }}>{qs.questionCount}</td>
                 <td style={{ padding: 10, textAlign: 'center' }}>{qs.fileType || '-'}</td>
                 <td style={{ padding: 10 }}>{qs.createdBy}</td>

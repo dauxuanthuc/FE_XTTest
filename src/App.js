@@ -6,6 +6,7 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Signup from './pages/Signup';
 import AdminPage from './pages/AdminPage';
+import AdminNotifications from './pages/AdminNotifications';
 import TeacherPage from './pages/TeacherPage';
 import UserPage from './pages/UserPage';
 import JoinClass from './pages/JoinClass';
@@ -38,6 +39,12 @@ function App() {
         <Route path="/admin" element={
           <RequireAuth roles={["ROLE_ADMIN"]}>
             <AdminPage />
+          </RequireAuth>
+        } />
+
+        <Route path="/admin/notifications" element={
+          <RequireAuth roles={["ROLE_ADMIN"]}>
+            <AdminNotifications />
           </RequireAuth>
         } />
 

@@ -4,6 +4,7 @@ import authService from '../services/auth.service';
 
 export default function StudyPractice() {
   const [sets, setSets] = useState([]);
+  const [selectedSubject, setSelectedSubject] = useState('All');
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState(null);
   const [questions, setQuestions] = useState([]);
@@ -14,8 +15,9 @@ export default function StudyPractice() {
   const [simAnswers, setSimAnswers] = useState({}); // {questionId: 'A' }
   const [simStarted, setSimStarted] = useState(false);
   const [simResult, setSimResult] = useState(null);
+  const [savedResults, setSavedResults] = useState([]);
   const [bookmarked, setBookmarked] = useState([]);
-  const token = authService.getToken();
+  
 
   // load bookmarked questions from localStorage
   useEffect(() => {
@@ -54,6 +56,13 @@ export default function StudyPractice() {
 
   useEffect(() => {
     fetchPublicSets();
+    // load saved simulate results
+    try {
+      const raw = localStorage.getItem('practiceSimResults');
+      if (raw) setSavedResults(JSON.parse(raw));
+    } catch (e) {
+      console.error('Failed to load saved simulate results', e);
+    }
   }, []);
 
   const fetchPublicSets = async () => {
@@ -139,6 +148,39 @@ export default function StudyPractice() {
     });
     setSimResult({ total, correct, details });
     setSimStarted(false);
+    // save to localStorage
+    try {
+      const setTitle = sets.find(s => s.id === selected)?.title || '';
+      const entry = {
+        id: Date.now(),
+        date: new Date().toISOString(),
+        setId: selected,
+        setTitle,
+        result: { total, correct, details }
+      };
+      const next = [entry, ...(savedResults || [])].slice(0, 50); // keep max 50
+      setSavedResults(next);
+      localStorage.setItem('practiceSimResults', JSON.stringify(next));
+    } catch (e) {
+      console.error('Failed to save simulate result', e);
+    }
+  };
+
+  const viewSavedResult = (entry) => {
+    setSimResult(entry.result);
+    setSimStarted(false);
+    setSelected(entry.setId);
+  };
+
+  const deleteSavedResult = (id) => {
+    const next = (savedResults || []).filter(r => r.id !== id);
+    setSavedResults(next);
+    localStorage.setItem('practiceSimResults', JSON.stringify(next));
+  };
+
+  const clearSavedResults = () => {
+    setSavedResults([]);
+    localStorage.removeItem('practiceSimResults');
   };
 
   const optionStyle = (isCorrect) => ({
@@ -167,10 +209,20 @@ export default function StudyPractice() {
               </div>
             )}
             {sets.length === 0 && <div>Không có bộ câu hỏi ôn</div>}
-            {sets.map(s => (
+            <div style={{ marginBottom: 10 }}>
+              <label>Chọn môn: </label>
+              <select value={selectedSubject} onChange={e => setSelectedSubject(e.target.value)} style={{ marginLeft: 8 }}>
+                <option value="All">Tất cả</option>
+                {[...new Set(sets.map(x => x.subject).filter(Boolean))].map(sub => (
+                  <option key={sub} value={sub}>{sub}</option>
+                ))}
+              </select>
+            </div>
+
+            {sets.filter(s => selectedSubject === 'All' || s.subject === selectedSubject).map(s => (
               <div key={s.id} style={{ padding: 10, border: '1px solid #ddd', marginBottom: 10 }}>
                 <div style={{ fontWeight: 'bold' }}>{s.title}</div>
-                <div style={{ fontSize: 13, color: '#666' }}>{s.questionCount || 0} câu</div>
+                <div style={{ fontSize: 13, color: '#666' }}>{s.questionCount || 0} câu — <span style={{ fontStyle: 'italic' }}>{s.subject || '—'}</span></div>
                 {mode === 'review' && <button onClick={() => startPractice(s.id)} style={{ marginTop: 8 }}>Xem đáp án</button>}
                 {mode === 'simulate' && <button onClick={() => startSimulate(s.id, simCount)} style={{ marginTop: 8 }}>Bắt đầu thi thử</button>}
               </div>
@@ -257,6 +309,21 @@ export default function StudyPractice() {
 
           <div style={{ width: 360 }}>
             <h3>Danh sách đã đánh dấu</h3>
+            <h4>Lịch sử thi thử</h4>
+            {(!savedResults || savedResults.length === 0) && <div>Chưa có kết quả thi thử</div>}
+            {savedResults && savedResults.map(r => (
+              <div key={r.id} style={{ padding: 8, border: '1px solid #eee', marginBottom: 8 }}>
+                <div style={{ fontWeight: '600' }}>{r.setTitle || 'Đề không tên'}</div>
+                <div style={{ fontSize: 13, color: '#666' }}>{new Date(r.date).toLocaleString()} — {r.result.correct}/{r.result.total} đúng</div>
+                <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
+                  <button onClick={() => viewSavedResult(r)} style={{ padding: '6px 10px' }}>Xem</button>
+                  <button onClick={() => deleteSavedResult(r.id)} style={{ padding: '6px 10px' }}>Xoá</button>
+                </div>
+              </div>
+            ))}
+            {savedResults && savedResults.length > 0 && <div style={{ marginTop: 6 }}><button onClick={clearSavedResults}>Xoá tất cả</button></div>}
+
+            <h3 style={{ marginTop: 12 }}>Danh sách đã đánh dấu</h3>
             {bookmarked.length === 0 && <div>Chưa có câu hỏi nào được đánh dấu</div>}
             {bookmarked.map(b => (
               <div key={b.id} style={{ padding: 8, border: '1px solid #eee', marginBottom: 8 }}>
