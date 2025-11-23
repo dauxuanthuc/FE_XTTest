@@ -57,6 +57,18 @@ function parseJwt(token) {
   }
 }
 
+function isTokenValid() {
+  const token = getToken();
+  if (!token) return false;
+  const payload = parseJwt(token);
+  if (!payload) return false;
+  if (payload.exp) {
+    const now = Math.floor(Date.now() / 1000);
+    return now < payload.exp;
+  }
+  return true;
+}
+
 async function login(username, password) {
   const res = await axios.post(`${API_URL}/api/auth/login`, { username, password });
   if (res.data && res.data.token) {
@@ -93,6 +105,7 @@ const authApi = {
   getToken,
   getCurrentUser,
   isAuthenticated,
+  isTokenValid,
 };
 
 export default authApi;
