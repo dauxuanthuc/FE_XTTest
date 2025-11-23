@@ -59,11 +59,7 @@ function App() {
           </RequireAuth>
         } />
 
-        <Route path="/student/practice" element={
-          <RequireAuth>
-            <StudyPractice />
-          </RequireAuth>
-        } />
+        <Route path="/student/practice" element={<StudyPractice />} />
 
         <Route path="/student/exam" element={
           <RequireAuth>

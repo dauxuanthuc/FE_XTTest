@@ -7,6 +7,13 @@ export default function StudyPractice() {
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState(null);
   const [questions, setQuestions] = useState([]);
+  const [mode, setMode] = useState('review'); // 'review' or 'simulate'
+  const [simCount, setSimCount] = useState(10);
+  const [simQuestions, setSimQuestions] = useState([]);
+  const [simIndex, setSimIndex] = useState(0);
+  const [simAnswers, setSimAnswers] = useState({}); // {questionId: 'A' }
+  const [simStarted, setSimStarted] = useState(false);
+  const [simResult, setSimResult] = useState(null);
   const [bookmarked, setBookmarked] = useState([]);
   const token = authService.getToken();
 
@@ -52,9 +59,7 @@ export default function StudyPractice() {
   const fetchPublicSets = async () => {
     setLoading(true);
     try {
-      const res = await axios.get('http://localhost:8080/api/student/question-sets', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await axios.get('http://localhost:8080/api/practice/question-sets');
       setSets(res.data || []);
     } catch (err) {
       console.error(err);
@@ -66,14 +71,74 @@ export default function StudyPractice() {
   const startPractice = async (setId) => {
     setSelected(setId);
     try {
-      const res = await axios.get(`http://localhost:8080/api/question-sets/${setId}/questions?mode=practice`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await axios.get(`http://localhost:8080/api/practice/question-sets/${setId}/questions`);
       // Ensure questions include correctAnswer for practice
       setQuestions(res.data || []);
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const shuffle = (arr) => {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  };
+
+  const startSimulate = async (setId, count) => {
+    setSelected(setId);
+    setSimResult(null);
+    setSimStarted(false);
+    try {
+      const res = await axios.get(`http://localhost:8080/api/practice/question-sets/${setId}/questions`);
+      const all = res.data || [];
+      if (all.length === 0) {
+        setSimQuestions([]);
+        return;
+      }
+      const shuffled = shuffle(all);
+      const take = Math.min(count || 10, shuffled.length);
+      const picked = shuffled.slice(0, take);
+      setSimQuestions(picked);
+      setSimAnswers({});
+      setSimIndex(0);
+      setSimStarted(true);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const selectSimAnswer = (questionId, choice) => {
+    setSimAnswers(prev => ({ ...prev, [questionId]: choice }));
+  };
+
+  const finishSimulate = () => {
+    const total = simQuestions.length;
+    let correct = 0;
+    const details = simQuestions.map(q => {
+      const sel = simAnswers[q.id];
+      const ok = sel && sel === q.correctAnswer;
+      if (ok) correct++;
+      const mapChoiceToText = (choice) => {
+        if (!choice) return null;
+        const key = `option${choice}`;
+        return q[key] || null;
+      };
+      return {
+        id: q.id,
+        questionText: q.questionText,
+        selected: sel || null,
+        selectedText: mapChoiceToText(sel),
+        correctAnswer: q.correctAnswer,
+        correctText: mapChoiceToText(q.correctAnswer),
+        ok
+      };
+    });
+    setSimResult({ total, correct, details });
+    setSimStarted(false);
   };
 
   const optionStyle = (isCorrect) => ({
@@ -92,46 +157,101 @@ export default function StudyPractice() {
         <div style={{ display: 'flex', gap: 20 }}>
           <div style={{ width: 340 }}>
             <h3>Bộ câu hỏi ôn (Có sẵn)</h3>
+            <div style={{ marginBottom: 10 }}>
+              <label style={{ marginRight: 8 }}><input type="radio" checked={mode === 'review'} onChange={() => setMode('review')} /> Ôn (Xem đáp án)</label>
+              <label><input type="radio" checked={mode === 'simulate'} onChange={() => setMode('simulate')} /> Thi thử (Giả lập)</label>
+            </div>
+            {mode === 'simulate' && (
+              <div style={{ marginBottom: 12 }}>
+                <label>Số câu: <input type="number" value={simCount} min={1} max={200} onChange={e => setSimCount(parseInt(e.target.value || '10'))} style={{ width: 80, marginLeft: 6 }} /></label>
+              </div>
+            )}
             {sets.length === 0 && <div>Không có bộ câu hỏi ôn</div>}
             {sets.map(s => (
               <div key={s.id} style={{ padding: 10, border: '1px solid #ddd', marginBottom: 10 }}>
                 <div style={{ fontWeight: 'bold' }}>{s.title}</div>
                 <div style={{ fontSize: 13, color: '#666' }}>{s.questionCount || 0} câu</div>
-                <button onClick={() => startPractice(s.id)} style={{ marginTop: 8 }}>Xem đáp án</button>
+                {mode === 'review' && <button onClick={() => startPractice(s.id)} style={{ marginTop: 8 }}>Xem đáp án</button>}
+                {mode === 'simulate' && <button onClick={() => startSimulate(s.id, simCount)} style={{ marginTop: 8 }}>Bắt đầu thi thử</button>}
               </div>
             ))}
           </div>
 
           <div style={{ flex: 1 }}>
-            {selected ? (
+            {simStarted ? (
               <div>
-                <h3>Danh sách câu hỏi và đáp án</h3>
-                {questions.length === 0 ? <div>Không có câu hỏi</div> : (
-                  <ol>
-                    {questions.map(q => (
-                      <li key={q.id} style={{ marginBottom: 14 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ fontWeight: 'bold', marginBottom: 6 }}>{q.questionText}</div>
-                          <div>
-                            <label style={{ fontSize: 14 }}>
-                              <input type="checkbox" checked={bookmarked.some(b => b.id === q.id)} onChange={() => toggleBookmark(q)} /> Đánh dấu ôn
-                            </label>
-                          </div>
-                        </div>
-                        <div>
-                          <div style={optionStyle(q.correctAnswer === 'A')}>A. {q.optionA}</div>
-                          <div style={optionStyle(q.correctAnswer === 'B')}>B. {q.optionB}</div>
-                          <div style={optionStyle(q.correctAnswer === 'C')}>C. {q.optionC}</div>
-                          <div style={optionStyle(q.correctAnswer === 'D')}>D. {q.optionD}</div>
-                        </div>
-                        {q.correctAnswer && <div style={{ marginTop: 8, color: '#2e7d32', fontWeight: '600' }}>Đáp án: {q.correctAnswer}</div>}
-                      </li>
+                <h3>Thi thử: Câu {simIndex + 1} / {simQuestions.length}</h3>
+                {simQuestions.length === 0 ? <div>Không có câu hỏi</div> : (
+                  <div>
+                    <div style={{ fontWeight: 'bold', marginBottom: 10 }}>{simQuestions[simIndex].questionText}</div>
+                    {['A','B','C','D'].map(ch => (
+                      <div key={ch} style={{ marginBottom: 8 }}>
+                        <button onClick={() => selectSimAnswer(simQuestions[simIndex].id, ch)} style={{ padding: 10, width: '100%', textAlign: 'left', background: simAnswers[simQuestions[simIndex].id] === ch ? '#cfe3ff' : '#fff' }}>
+                          {ch}. {simQuestions[simIndex][`option${ch}`]}
+                        </button>
+                      </div>
                     ))}
-                  </ol>
+                    <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                      <button onClick={() => setSimIndex(i => Math.max(0, i - 1))} disabled={simIndex === 0}>Trước</button>
+                      <button onClick={() => setSimIndex(i => Math.min(simQuestions.length - 1, i + 1))} disabled={simIndex === simQuestions.length - 1}>Tiếp</button>
+                      <button onClick={finishSimulate}>Hoàn thành</button>
+                    </div>
+                    <div style={{ marginTop: 10 }}>
+                      Đã trả lời: {Object.keys(simAnswers).length} / {simQuestions.length}
+                    </div>
+                  </div>
                 )}
               </div>
+            ) : simResult ? (
+              <div>
+                <h3>Kết quả thi thử</h3>
+                <div style={{ fontSize: 18, fontWeight: '700' }}>{simResult.correct} / {simResult.total} đúng</div>
+                <div style={{ marginTop: 12 }}>
+                  {simResult.details.map(d => (
+                    <div key={d.id} style={{ padding: 8, border: '1px solid #eee', marginBottom: 8 }}>
+                      <div style={{ fontWeight: '600' }}>{d.questionText}</div>
+                      <div>Đáp án bạn chọn: {d.selected ? `${d.selected} — ${d.selectedText || ''}` : '—'}</div>
+                      <div>Đáp án đúng: {d.correctAnswer ? `${d.correctAnswer} — ${d.correctText || ''}` : '—'}</div>
+                      <div style={{ color: d.ok ? '#2e7d32' : '#c62828', fontWeight: 600 }}>{d.ok ? 'Đúng' : 'Sai'}</div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: 12 }}>
+                  <button onClick={() => { setSimResult(null); setSimQuestions([]); setSelected(null); }}>Quay lại</button>
+                </div>
+              </div>
             ) : (
-              <div>Chọn một bộ câu hỏi để xem đáp án ngay lập tức.</div>
+              // default review UI
+              (selected ? (
+                <div>
+                  <h3>Danh sách câu hỏi và đáp án</h3>
+                  {questions.length === 0 ? <div>Không có câu hỏi</div> : (
+                    <ol>
+                      {questions.map(q => (
+                        <li key={q.id} style={{ marginBottom: 14 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ fontWeight: 'bold', marginBottom: 6 }}>{q.questionText}</div>
+                            <div>
+                              <label style={{ fontSize: 14 }}>
+                                <input type="checkbox" checked={bookmarked.some(b => b.id === q.id)} onChange={() => toggleBookmark(q)} /> Đánh dấu ôn
+                              </label>
+                            </div>
+                          </div>
+                          <div>
+                            <div style={optionStyle(q.correctAnswer === 'A')}>A. {q.optionA}</div>
+                            <div style={optionStyle(q.correctAnswer === 'B')}>B. {q.optionB}</div>
+                            <div style={optionStyle(q.correctAnswer === 'C')}>C. {q.optionC}</div>
+                            <div style={optionStyle(q.correctAnswer === 'D')}>D. {q.optionD}</div>
+                          </div>
+                          {q.correctAnswer && <div style={{ marginTop: 8, color: '#2e7d32', fontWeight: '600' }}>Đáp án: {q.correctAnswer}</div>}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </div>
+              ) : (
+                <div>Chọn một bộ câu hỏi để xem đáp án ngay lập tức.</div>
+              ))
             )}
           </div>
 

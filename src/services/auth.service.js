@@ -14,10 +14,17 @@ axios.interceptors.response.use(
   response => response,
   error => {
     if (error.response && error.response.status === 401) {
-      console.log('Token invalid or expired, clearing storage');
-      localStorage.removeItem(TOKEN_KEY);
-      delete axios.defaults.headers.common['Authorization'];
-      window.location.href = '/login';
+      // Chỉ redirect về login nếu đây là API cần bảo vệ
+      const url = error.config.url || '';
+      const publicEndpoints = ['/api/practice'];
+      const isPublicEndpoint = publicEndpoints.some(ep => url.includes(ep));
+      
+      if (!isPublicEndpoint) {
+        console.log('Token invalid or expired, clearing storage');
+        localStorage.removeItem(TOKEN_KEY);
+        delete axios.defaults.headers.common['Authorization'];
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
